@@ -73,6 +73,16 @@ $ sudo apt-get update
 $ sudo apt-get install bladerf libbladerf-dev bladerf-firmware-fx3 bladerf-fpga-hostedx40 
 ```
 
+- USRP installation (skip this if you use BladeRF)
+
+please refer to https://files.ettus.com/manual/page_install.html for a complete installation guide
+To activate the release PPA, simply:
+```sh
+$ sudo add-apt-repository ppa:ettusresearch/uhd
+$ sudo apt-get update
+$ sudo apt-get install libuhd-dev libuhd003 uhd-host
+```
+
 - Install srsgui 
 
 This is not mandatory for OWL to work, but is a nice tool and it helps testing srsLTE and OWL:
