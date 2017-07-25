@@ -126,7 +126,7 @@ $ cmake ../
 $ make
 ```
 
-If everything succeeded you will find OWL's executables together with srsLTE's examples in the srsLTE/build/srslte/examples folder.
+If everything succeeded you will find OWL's executables together with srsLTE's examples in the imdeaowl/build/lib/examples folder.
 
 Part 2 - Executable description:
 --------------------------------
