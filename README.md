@@ -49,21 +49,22 @@ We have tested the following hardware:
  * USRP B210
  * USRP X300
  * bladeRF
+ * limeSDR
 
 OWL installation and minimal use guide:
 =======================================
 
-OWL is built on the srsLTE library by Software Radio Systems. Thus, if you are already able to use srsLTE (at least pdsch_ue) OWL should run without many issues. However, this guide will give you the minimum set of information to install all the required software on a clean ubuntu 14.04+ installation. Also, this guide include steps for the preferable installation of the Nuand BladeRF software. OWL is also tested on USRP x310, but the guide for a correct installation of the related UHD library is to be done in the next release. 
+OWL is built on the srsLTE library by Software Radio Systems. Thus, if you are already able to use srsLTE (at least pdsch_ue) OWL should run without many issues. However, this guide will give you the minimum set of information to install all the required software on a clean ubuntu 14.04+ installation. 
 
 Part 1 - Installation:
 ----------------------
 - Install dependencies:
 
 ```sh
-$ sudo apt-get install build-essential git cmake libboost-system-dev libboost-test-dev libboost-thread-dev libqwt-dev libqt4-dev libfftw3-dev
+$ sudo apt-get install build-essential git cmake libboost-system-dev libboost-test-dev libboost-thread-dev libqwt-dev libqt4-dev libfftw3-dev libsctp-dev libconfig-dev libconfig++-dev
 ```
 
-- BladeRF installation (skip this if you use USRP)
+- BladeRF installation (optional)
 
 please refer to https://github.com/Nuand/bladeRF/wiki/Getting-Started%3A-Linux for a complete installation guide
 To activate the release PPA, simply:
@@ -73,7 +74,28 @@ $ sudo apt-get update
 $ sudo apt-get install bladerf libbladerf-dev bladerf-firmware-fx3 bladerf-fpga-hostedx40 
 ```
 
-- Install srsgui 
+- USRP installation (optional)
+
+please refer to https://files.ettus.com/manual/page_install.html for a complete installation guide
+To activate the release PPA, simply:
+```sh
+$ sudo add-apt-repository ppa:ettusresearch/uhd
+$ sudo apt-get update
+$ sudo apt-get install libuhd-dev libuhd003 uhd-host
+```
+
+- LimeSDR installation (optional)
+
+please refer to https://wiki.myriadrf.org/Lime_Suite for a complete installation guide
+To activate the release PPA, simply:
+```sh
+sudo add-apt-repository -y ppa:myriadrf/drivers
+sudo apt-get update
+sudo apt-get install limesuite limesuite-udev limesuite-images
+sudo apt-get install soapysdr soapysdr-module-lms7 libsoapysdr-dev
+```
+
+- Install srsgui (optional)
 
 This is not mandatory for OWL to work, but is a nice tool and it helps testing srsLTE and OWL:
 ```sh
@@ -147,13 +169,13 @@ sync loss (bad)
 
 - imdea_cc_decoder
 
-This program is the main part of OWL, where the control channel is decoded. It works both online and offline and pre-recorded traces.
+This program is the main part of OWL, where the control channel is decoded. It works both online and offline and pre-recorded traces. The imdea_cc_decoder is automatically set for the graphic output (see the screenshot below). To disable it, just add -d to the command line.
 
 Online usage:
 ```sh
-$ ./imdea_cc_decoder -f <freq> -n <subframe_num> 1> <cc_out_filename> 2> /dev/null
+$ ./imdea_cc_decoder -f <freq> -n <subframe_num> 1> <cc_out_filename>
 ```
-&lt;cc_out_filename> specifies where to save the decoded control channel messages. If omitted, the messages are printed to the stdout. Don't forget to redirect the stderr (2> /dev/null), which is used to produce the list of location to be checked by the fine-tuner.
+&lt;cc_out_filename> specifies where to save the decoded control channel messages. If omitted, the messages are printed to the stdout. To have OWL output the undecod control messages on stderr you have to enable the LOG_ERRORS symbols in ue_dl.h
 The output of the decoder is a tab separated list where each line represents a decoded message. The columns are as follows:
   1.	SFN: internal timing of LTE (1 every frame = 10 ms)
   2.	subframe index from 0 to 9 (1 subframe = 1 ms)
@@ -187,31 +209,6 @@ $ ./imdea_cc_decoder -i <input_trace_filename> -l <cell_num> -c <pci> -P <ports>
   4. L
   5. CFI
 
-- imdea_fine_tuner
-
-offline tool to post_process recorded trace to try to decode DCI messages in location that could not be decoded by imdea_cc_decoder.
-Usage:
-```sh
-$ ./imdea_fine_tuner -i <input_trace_filename> -l <cell_num> -c <pci> -P <ports> -p <prb> -z <cc_fix_filename> -Z <rnti_in_filename> 1> <cc_fixed_filename> 2> /dev/null
-```
-
-it can only be used after imdea_cc_decoder on the output produced. imdea_fine_tuner generate <cc_fixed_filename> with the same format of <cc_out_filename> (see above)
-
-- imdea_cc_decoder_graph
-
-This program is identical to imdea_cc_decoder, but in addition it displays five graphs:
-1. a spectrograph of the received power
-2. average downlink frame resource usage 
-3. average downlink frame data rate
-4. average uplink frame resource usage 
-5. average uplink frame data rate
-
-Online usage:
-```sh
-$ ./imdea_cc_decoder_graph -f <freq> &> /dev/null
-```
-Both stderr and stdout are redirected to /dev/null, because they will produce the same output as imdea_cc_decoder does. Below an example of the obtained graphs.
-
 ![alt text](capture.png "Graphical Decoder")
 
 Part 3 - OWL setup and first use
@@ -229,19 +226,21 @@ Part 3 - OWL setup and first use
 - Try first the online decoder with the output on screen:
 
 ```sh
-$ ./imdea_cc_decoder -f <freq> -n <subframe_num> 2> /dev/null
+$ ./imdea_cc_decoder -f <freq> -n <subframe_num> -d
 ```
 
-- Try a capture, with subsequent decoding and fine tuning:
+To have the graphical demo with no texttual output
+```sh
+$ ./imdea_cc_decoder -f <freq> -n <subframe_num> > /dev/null
+```
+
+- Try a capture, with subsequent decoding
 
 ```sh
 $ ./imdea_capture_sync -f <freq> -l <cell_num> -n <subframe_num> -o <output_filename>
-$ ./imdea_cc_decoder -i <input_trace_filename> -l <cell_num> -c <pci> -P <ports> -p <prb> -z <rnti_out_filename> -Z <rnti_in_filename> 1> <cc_out_filename> 2> <cc_fix_filename>
-$ ./imdea_fine_tuner -i <input_trace_filename> -l <cell_num> -c <pci> -P <ports> -p <prb> -z <cc_fix_filename> -Z <rnti_in_filename> 1> <cc_fixed_filename> 2> /dev/null
-$ sort -u <cc_out_filename> <cc_fixed_filename> -o <cc_total_filename> (to combine the output)
+$ ./imdea_cc_decoder -i <input_trace_filename> -l <cell_num> -c <pci> -P <ports> -p <prb> -z <rnti_out_filename> -Z <rnti_in_filename> -d 1> <cc_out_filename>
 ```
 
-- You can also use the recorded trace to obtain a spectrogram of the LTE transmission (in a future release, I will provide matlab and octave scripts to do that as well).
 - Have fun!
 
 Acknowledgements
