@@ -61,7 +61,7 @@ Part 1 - Installation:
 - Install dependencies:
 
 ```sh
-$ sudo apt-get install build-essential git cmake libboost-system-dev libboost-test-dev libboost-thread-dev libqwt-dev libqt4-dev libfftw3-dev libsctp-dev libconfig-dev libconfig++-dev
+$ sudo apt-get install build-essential git subversion cmake libboost-system-dev libboost-test-dev libboost-thread-dev libqwt-dev libqt4-dev libfftw3-dev libsctp-dev libconfig-dev libconfig++-dev libmbedtls-dev
 ```
 
 - BladeRF installation (optional)
