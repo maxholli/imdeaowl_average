@@ -3,6 +3,8 @@ IMDEA-OWL modified with averaging
 
 imdea_cc_decoder is modified to print averages instead of the raw control channel values.
 
+The goal was to try and modify OWL to run like SRS' AirScope.
+
 Download and compile just like imdeaowl.
 
 Usage is just like imdeaowl.
