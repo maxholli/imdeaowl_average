@@ -10,7 +10,7 @@ Usage is just like imdeaowl.
 $ ./imdea_cc_decoder -d -f <freq>
 ```
 
-![alt text](OWL_average_demo.png "mod OWL")
+![alt text](OWL_mod.png "mod OWL")
 
 
 
