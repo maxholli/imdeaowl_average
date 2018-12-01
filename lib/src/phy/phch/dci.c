@@ -43,6 +43,165 @@
 
 #define HARQ_PID_LEN 3 
 
+
+// MAX's contribution: like imdea but with for average values
+int srslte_dci_msg_to_average(srslte_dci_msg_t *msg, uint16_t msg_rnti,
+		uint32_t nof_prb, uint32_t nof_ports, srslte_ra_dl_dci_t *dl_dci, srslte_ra_ul_dci_t *ul_dci,
+		srslte_ra_dl_grant_t *dl_grant, srslte_ra_ul_grant_t *ul_grant, uint8_t sf_idx, uint32_t sfn, int prob,
+			      uint32_t ncce, uint32_t aggregation, srslte_dci_format_t format, uint32_t cfi, float power,
+			      uint16_t *RNTI_array, uint16_t *RNTI_i, uint64_t *dl_bit_sum, uint64_t *ul_bit_sum, uint64_t *dl_rb_sum, uint64_t *ul_rb_sum)
+{
+			  
+	int ret = SRSLTE_ERROR_INVALID_INPUTS;
+	bool crc_is_crnti;
+	
+	
+	if (msg               !=  NULL)
+	{
+
+		ret = SRSLTE_ERROR;
+
+		// to print the raw dci meassge
+		//	  if (sfn==555) {
+//			  if (msg_rnti < 11) {
+//		      for (int i=0; i< msg->nof_bits; i++) {
+//				  fprintf(stdout,"%d",msg->data[i]);
+//			  }
+//			  fprintf(stdout,"\n");
+//			  }
+		//	  }
+		//	  if (sfn!=555) exit(0);
+
+		if (format==SRSLTE_DCI_FORMAT0) {
+			if (msg->data[0]==0) {
+				bzero(ul_dci, sizeof(srslte_ra_ul_dci_t));
+				bzero(ul_grant, sizeof(srslte_ra_ul_grant_t));
+				bzero(dl_dci, sizeof(srslte_ra_dl_dci_t));
+				bzero(dl_grant, sizeof(srslte_ra_dl_grant_t));
+				crc_is_crnti = false;
+				if (msg_rnti >= SRSLTE_CRNTI_START && msg_rnti <= SRSLTE_CRNTI_END) {
+					crc_is_crnti = true;
+				}
+				if (srslte_dci_msg_unpack_pusch(msg, ul_dci, nof_prb)) {
+					DEBUG("Can't unpack UL DCI message: most likely SPS\n",0);
+					return ret;
+				}
+
+				if (srslte_ra_ul_dci_to_grant(ul_dci, nof_prb, 0, ul_grant, (10*sfn + sf_idx)%8)) {
+					return ret;
+				}
+				//must be uplink
+				if (msg_rnti>=0x0010 && msg_rnti<=0xfff3) {
+				  if (ul_dci->mcs_idx < 29) {
+				    
+				    //fprintf(stdout, "%04d\t%d\t%d\t0\t"
+				    //				"%d\t%d\t%d\t%d\t%d\t"
+				    //				"0\t%d\t-1\t%d\t"
+				    //				"%d\t%d\t%d\t%d\n", sfn, sf_idx, msg_rnti,
+				    //				ul_grant->mcs.idx, ul_grant->L_prb, ul_grant->mcs.tbs, -1, -1,
+				    //				ul_dci->ndi, (10*sfn+sf_idx)%8,
+				    //				ncce, aggregation, cfi, prob);
+						//MAX: Add to totals
+						RNTI_array[*RNTI_i] = msg_rnti;
+						*RNTI_i = *RNTI_i + 1;
+						*ul_bit_sum += ul_grant->mcs.tbs;
+						*ul_rb_sum += ul_grant->L_prb;
+					} else {
+			
+				    //	fprintf(stdout, "%04d\t%d\t%d\t0\t"
+				    //				"%d\t%d\t%d\t%d\t%d\t"
+				    //				"0\t%d\t-1\t%d\t"
+				    //				"%d\t%d\t%d\t%d\n", sfn, sf_idx, msg_rnti,
+				    //				ul_grant->mcs.idx, ul_grant->L_prb, 0, -1, -1,
+				    //				ul_dci->ndi, (10*sfn+sf_idx)%8,
+				    //				ncce, aggregation, cfi, prob);
+						//MAX: Add to totals
+						RNTI_array[*RNTI_i] = msg_rnti;
+						*RNTI_i = *RNTI_i + 1;
+						*ul_bit_sum += 0;
+						*ul_rb_sum += ul_grant->L_prb;
+					}
+				}
+				ret = SRSLTE_SUCCESS;
+
+			} else {
+				printf("wrong upload\n");
+			}
+		} else {
+			bzero(dl_dci, sizeof(srslte_ra_dl_dci_t));
+			bzero(dl_grant, sizeof(srslte_ra_dl_grant_t));
+			bzero(ul_dci, sizeof(srslte_ra_ul_dci_t));
+			bzero(ul_grant, sizeof(srslte_ra_ul_grant_t));
+
+			crc_is_crnti = false;
+			if (msg_rnti >= SRSLTE_CRNTI_START && msg_rnti <= SRSLTE_CRNTI_END) {
+				crc_is_crnti = true;
+			}
+			msg->format = format;
+			if (srslte_dci_msg_unpack_pdsch(msg, dl_dci, nof_prb, nof_ports, crc_is_crnti)) { // maybe move inside previous if
+				DEBUG("Can't unpack DL DCI message: most likely SPS\n",0);
+				return ret;
+			}
+			// must be downlink
+			if (srslte_ra_dl_dci_to_grant(dl_dci, nof_prb, msg_rnti, dl_grant)==SRSLTE_SUCCESS) {
+				switch(msg->format) {
+				case SRSLTE_DCI_FORMAT0:
+					printf("Error: no reason to be here\n");
+					break;
+				case SRSLTE_DCI_FORMAT1:
+				case SRSLTE_DCI_FORMAT1A:
+				case SRSLTE_DCI_FORMAT1C:
+				case SRSLTE_DCI_FORMAT1B:
+				case SRSLTE_DCI_FORMAT1D:
+			
+				  //	fprintf(stdout, "%04d\t%d\t%d\t1\t"
+				  //			"%d\t%d\t%d\t%d\t%d\t"
+				  //			"%d\t%d\t%d\t%d\t"
+				  //			"%d\t%d\t%d\t%d\n", sfn, sf_idx, msg_rnti,
+				  //			dl_grant->mcs.idx, dl_grant->nof_prb, dl_grant->mcs.tbs, -1, -1,
+				  //			msg->format+1, dl_dci->ndi, -1, dl_dci->harq_process,
+				  //			ncce, aggregation, cfi, prob);
+					//MAX: Add to totals
+					RNTI_array[*RNTI_i] = msg_rnti;
+					*RNTI_i = *RNTI_i + 1;
+					*dl_bit_sum += dl_grant->mcs.tbs;
+					*dl_rb_sum += dl_grant->nof_prb;
+
+					break;
+				case SRSLTE_DCI_FORMAT2:
+				case SRSLTE_DCI_FORMAT2A:
+				case SRSLTE_DCI_FORMAT2B:
+			
+				  //	fprintf(stdout, "%04d\t%d\t%d\t1\t"
+				  //			"%d\t%d\t%d\t%d\t%d\t"
+				  //			"%d\t%d\t%d\t%d\t"
+				  //			"%d\t%d\t%d\t%d\n", sfn, sf_idx, msg_rnti,
+				  //			dl_grant->mcs.idx, dl_grant->nof_prb, dl_grant->mcs.tbs + dl_grant->mcs2.tbs, dl_grant->mcs.tbs, dl_grant->mcs2.tbs,
+				  //			msg->format+1, dl_dci->ndi, dl_dci->ndi_1, dl_dci->harq_process,
+				  //		ncce, aggregation, cfi, prob);
+					//MAX: Add to totals
+					RNTI_array[*RNTI_i] = msg_rnti;
+					*RNTI_i = *RNTI_i + 1;
+					*dl_bit_sum += dl_grant->mcs.tbs + dl_grant->mcs2.tbs;
+					*dl_rb_sum += dl_grant->nof_prb;
+
+					break;
+				//case SRSLTE_DCI_FORMAT3:
+				//case SRSLTE_DCI_FORMAT3A:
+				default:
+					printf("Other formats\n");
+				}
+			}
+			ret = SRSLTE_SUCCESS;
+
+		}
+
+	}
+	return ret;
+}
+// end MAX's contribution
+
+
 // IMDEA contribution: this function prints the traces for the LTE sniffer either on stdout, file or both
 int srslte_dci_msg_to_trace(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 		uint32_t nof_prb, uint32_t nof_ports, srslte_ra_dl_dci_t *dl_dci, srslte_ra_ul_dci_t *ul_dci,
@@ -86,8 +245,10 @@ int srslte_dci_msg_to_trace(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 				if (srslte_ra_ul_dci_to_grant(ul_dci, nof_prb, 0, ul_grant, (10*sfn + sf_idx)%8)) {
 					return ret;
 				}
+				//must be uplink
 				if (msg_rnti>=0x0010 && msg_rnti<=0xfff3) {
 					if (ul_dci->mcs_idx < 29) {
+					  printf("print_note1\n");
 						fprintf(stdout, "%04d\t%d\t%d\t0\t"
 								"%d\t%d\t%d\t%d\t%d\t"
 								"0\t%d\t-1\t%d\t"
@@ -96,6 +257,7 @@ int srslte_dci_msg_to_trace(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 								ul_dci->ndi, (10*sfn+sf_idx)%8,
 								ncce, aggregation, cfi, prob);
 					} else {
+					  printf("print_note2\n");
 						fprintf(stdout, "%04d\t%d\t%d\t0\t"
 								"%d\t%d\t%d\t%d\t%d\t"
 								"0\t%d\t-1\t%d\t"
@@ -125,7 +287,7 @@ int srslte_dci_msg_to_trace(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 				DEBUG("Can't unpack DL DCI message: most likely SPS\n",0);
 				return ret;
 			}
-
+			// must be downlink
 			if (srslte_ra_dl_dci_to_grant(dl_dci, nof_prb, msg_rnti, dl_grant)==SRSLTE_SUCCESS) {
 				switch(msg->format) {
 				case SRSLTE_DCI_FORMAT0:
@@ -136,6 +298,7 @@ int srslte_dci_msg_to_trace(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 				case SRSLTE_DCI_FORMAT1C:
 				case SRSLTE_DCI_FORMAT1B:
 				case SRSLTE_DCI_FORMAT1D:
+				  printf("print_note3\n");
 					fprintf(stdout, "%04d\t%d\t%d\t1\t"
 							"%d\t%d\t%d\t%d\t%d\t"
 							"%d\t%d\t%d\t%d\t"
@@ -147,6 +310,7 @@ int srslte_dci_msg_to_trace(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 				case SRSLTE_DCI_FORMAT2:
 				case SRSLTE_DCI_FORMAT2A:
 				case SRSLTE_DCI_FORMAT2B:
+				  printf("print_note4\n");
 					fprintf(stdout, "%04d\t%d\t%d\t1\t"
 							"%d\t%d\t%d\t%d\t%d\t"
 							"%d\t%d\t%d\t%d\t"

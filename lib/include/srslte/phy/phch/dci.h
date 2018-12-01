@@ -105,6 +105,30 @@ typedef struct SRSLTE_API {
   bool hopping_flag; 
 } srslte_dci_rar_grant_t;
 
+// MAX contribution: this is imdea for average
+SRSLTE_API int srslte_dci_msg_to_average(srslte_dci_msg_t *msg,
+				   uint16_t msg_rnti,
+				   uint32_t nof_prb,
+				   uint32_t nof_ports,
+				   srslte_ra_dl_dci_t *dl_dci,
+				   srslte_ra_ul_dci_t *ul_dci,
+				   srslte_ra_dl_grant_t *dl_grant,
+				   srslte_ra_ul_grant_t *ul_grant,
+				   uint8_t sf_idx,
+				   uint32_t sfn,
+				   int prob,
+				   uint32_t ncce,
+				   uint32_t aggregation,
+				   srslte_dci_format_t format,
+				   uint32_t cfi,
+				       float power,
+				       uint16_t *RNTI_array,
+				       uint16_t *RNTI_i,
+				       uint64_t *dl_bit_sum,
+				       uint64_t *ul_bit_sum,
+				       uint64_t *dl_rb_sum,
+				       uint64_t *ul_rb_sum);
+
 // IMDEA contribution: this function prints the traces for the LTE sniffer either on stdout, file or both
 SRSLTE_API int srslte_dci_msg_to_trace(srslte_dci_msg_t *msg,
 				   uint16_t msg_rnti,

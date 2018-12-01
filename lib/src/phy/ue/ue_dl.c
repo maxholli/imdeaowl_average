@@ -569,7 +569,8 @@ static int find_dl_dci_type_crnti(srslte_ue_dl_t *q, uint32_t cfi, uint32_t sf_i
 }
 
 int srslte_ue_dl_find_dci_cc(srslte_ue_dl_t *q, srslte_dci_msg_t *dci_msg, uint32_t cfi, uint32_t sf_idx,
-								srslte_rnti_type_t rnti_type, uint32_t sfn)
+			     srslte_rnti_type_t rnti_type, uint32_t sfn,
+			     uint16_t *RNTI_array, uint16_t *RNTI_i, uint64_t *dl_bit_sum, uint64_t *ul_bit_sum, uint64_t *dl_rb_sum, uint64_t *ul_rb_sum)
 	/* IMDEA contribution: DCI power analysis */
 {
   srslte_dci_location_t locations[MAX_CANDIDATES_BLIND];
@@ -623,13 +624,16 @@ int srslte_ue_dl_find_dci_cc(srslte_ue_dl_t *q, srslte_dci_msg_t *dci_msg, uint3
 			  //printf("t=%d.%d (%d (%d)), ret %d, crnti 0x%x\n", sfn, sf_idx, locations[i].ncce, locations[i].L, lprob[i], crc_rem);
 			  /* print the DCI information */
 			  /* TODO save this information somewhere to be reused by other modules */
-			  if (srslte_dci_msg_to_trace(dci_msg, crc_rem, q->cell.nof_prb, q->cell.nof_ports,
+		    //MAX NOTE: THIS IS WHERE I REPLACED srslte_dci_msg_to_trace with my own averaging function.
+			  if (srslte_dci_msg_to_average(dci_msg, crc_rem, q->cell.nof_prb, q->cell.nof_ports,
 				  &dl_dci_unpacked, &ul_dci_unpacked, &dl_grant, &ul_grant, sf_idx, sfn, lprob[i],
-				  locations[i].ncce, locations[i].L, formats[f], q->cfi, power)) {
-				  continue;
+							locations[i].ncce, locations[i].L, formats[f], q->cfi, power,
+							RNTI_array, RNTI_i, dl_bit_sum, ul_bit_sum, dl_rb_sum, ul_rb_sum)) {
+			    continue;
 				  //fprintf(stderr,"1 Error unpacking DCI\n");
 			  }
-			  /* add the C-RNTI to the white list */
+			    
+			    /* add the C-RNTI to the white list */
 			  srslte_ue_dl_reset_rnti_user(q, crc_rem);
 			  ret++;
 			  /* checks whether the DCI carries an RA-RNTI. If so marks the current_rnti as the RA-RNTI */
@@ -671,11 +675,13 @@ int srslte_ue_dl_find_dci_cc(srslte_ue_dl_t *q, srslte_dci_msg_t *dci_msg, uint3
   return ret;
 }
 
-
-int srslte_ue_dl_get_control_cc(srslte_ue_dl_t *q, cf_t *input[SRSLTE_MAX_PORTS], uint8_t *data, uint32_t sf_idx, uint32_t rvidx, uint32_t sfn)
+// MAXNOTE: srslte_ue_dl_get_control_cc is OWL's addition
+int srslte_ue_dl_get_control_cc(srslte_ue_dl_t *q, cf_t *input[SRSLTE_MAX_PORTS], uint8_t *data, uint32_t sf_idx, uint32_t rvidx, uint32_t sfn,
+				uint16_t *RNTI_array, uint16_t *RNTI_i, uint64_t *dl_bit_sum, uint64_t *ul_bit_sum, uint64_t *dl_rb_sum, uint64_t *ul_rb_sum)
 {
   srslte_dci_msg_t dci_msg;
   int ret = SRSLTE_ERROR;
+
 
   if ((ret = srslte_ue_dl_decode_fft_estimate_multi(q, input, sf_idx, &q->cfi)) < 0) {
     return ret;
@@ -688,7 +694,9 @@ int srslte_ue_dl_get_control_cc(srslte_ue_dl_t *q, cf_t *input[SRSLTE_MAX_PORTS]
     return SRSLTE_ERROR;
   }
 
-  return srslte_ue_dl_find_dci_cc(q, &dci_msg, q->cfi, sf_idx, SRSLTE_RNTI_USER, sfn);
+  //below contains the prints
+  return srslte_ue_dl_find_dci_cc(q, &dci_msg, q->cfi, sf_idx, SRSLTE_RNTI_USER, sfn,
+				  RNTI_array, RNTI_i, dl_bit_sum, ul_bit_sum, dl_rb_sum, ul_rb_sum);
 }
 
 int srslte_ue_dl_find_dl_dci_type(srslte_ue_dl_t *q, uint32_t cfi, uint32_t sf_idx, 

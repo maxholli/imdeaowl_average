@@ -40,6 +40,7 @@
 
 #include "srslte/srslte.h"
 
+#define FRAME_AVE 100
 #define PLOT_REFRESH_SFN 10
 #define ENABLE_AGC_DEFAULT
 //#define CORRECT_SAMPLE_OFFSET
@@ -66,6 +67,20 @@ cell_search_cfg_t cell_detect_config = {
 #else
 #warning Compiling pdsch_ue with no RF support
 #endif
+
+
+uint16_t *RNTI_array;
+uint16_t *T_RNTI_array;
+uint16_t T_RNTI_i;
+uint64_t T_dbs;
+uint64_t T_ubs;
+uint64_t T_drs;
+uint64_t T_urs;
+uint16_t T_nof_prb;
+pthread_mutex_t mutex_print;
+
+
+
 
 //#define STDOUT_COMPACT
 
@@ -270,6 +285,45 @@ void sig_int_handler(int signo)
 
 cf_t *sf_buffer[2] = {NULL, NULL}; 
 
+// MAX's contribution
+uint16_t count_unique_rnti(uint16_t *RNTI_array, uint16_t RNTI_i)
+{
+  uint16_t uni_count = 0;
+  for (int i = 0; i < RNTI_i; i++) {
+    uint8_t is_unique = 1;
+    for (int j = 0; j < i; j++) {
+      if (RNTI_array[i] == RNTI_array[j]) {
+	is_unique = 0;
+      }
+    }
+    if (is_unique) {
+      uni_count++;
+    }
+  }
+  return uni_count;
+}
+
+
+void *PrintThread(void *threadid)
+{
+  //long tid;
+  //tid = (long) threadid;
+
+  while (1) {
+    pthread_mutex_lock(&mutex_print);
+    for(int i = 0; i < T_RNTI_i; i++) {
+      T_RNTI_array[i] = RNTI_array[i];
+    }
+    
+    //printf("hello world! it's me, thread #%ld %d %d\n", tid, i+1, print_i);
+    //printf("array length = %d\n", T_RNTI_i);
+    //printf("num unique RNTI %d\n", count_unique_rnti(T_RNTI_array, T_RNTI_i));
+    printf("rnti %3d\t|   DL\t%.3f\t%8d   |   UL\t%.3f\t%8d\n", count_unique_rnti(T_RNTI_array, T_RNTI_i), T_drs / (T_nof_prb * 10.0 * FRAME_AVE), T_dbs, T_urs / (T_nof_prb * 10.0 * FRAME_AVE), T_ubs);
+  }
+
+  pthread_exit(NULL);
+}
+
 #ifndef DISABLE_RF
 int srslte_rf_recv_wrapper(void *h, cf_t *data[SRSLTE_MAX_PORTS], uint32_t nsamples, srslte_timestamp_t *t) {
 	DEBUG(" ----  Receive %d samples  ---- \n", nsamples);
@@ -297,8 +351,25 @@ prog_args_t prog_args;
 uint32_t sfn = 0; // system frame number
 srslte_netsink_t net_sink, net_sink_signal; 
 
+
+
+
 int main(int argc, char **argv) {
-	int ret;
+  T_RNTI_array = malloc(sizeof(uint16_t)*200*FRAME_AVE);
+  pthread_mutex_lock(&mutex_print);
+
+  pthread_t mthread;
+  int rc;
+  long t = 1;
+  
+  rc = pthread_create(&mthread, NULL, PrintThread, (void *)t);
+  if (rc) {
+    printf("something went wrong with pthread create\n");
+    exit(-1);
+  }
+  
+  
+  int ret;
 	int decimate = 1;
 	srslte_cell_t cell;
 	int64_t sf_cnt;
@@ -524,6 +595,15 @@ int main(int argc, char **argv) {
 	srslte_pbch_decode_reset(&ue_mib.pbch);
 
 	INFO("\nEntering main loop...\n\n", 0);
+
+	RNTI_array = malloc(sizeof(uint16_t)*200*FRAME_AVE);
+	uint16_t RNTI_i = 0;
+	uint64_t dl_bit_sum = 0;
+	uint64_t ul_bit_sum = 0;
+	uint64_t dl_rb_sum = 0;
+	uint64_t ul_rb_sum = 0;
+	uint32_t last_sfn_ave = 0;
+
 	/* Main loop */
 	while (!go_exit && (sf_cnt < prog_args.nof_subframes || prog_args.nof_subframes == -1)) {
 
@@ -549,6 +629,7 @@ int main(int argc, char **argv) {
 
 		/* srslte_ue_sync_get_buffer returns 1 if successfully read 1 aligned subframe */
 		if (ret == 1) {
+
 			switch (state) {
 			case DECODE_MIB:
 				if (srslte_ue_sync_get_sfidx(&ue_sync) == 0) {
@@ -560,16 +641,55 @@ int main(int argc, char **argv) {
 						srslte_pbch_mib_unpack(bch_payload, &cell, &sfn);
 						srslte_cell_fprint(stdout, &cell, sfn);
 						printf("Decoded MIB. SFN: %d, offset: %d\n", sfn, sfn_offset);
+						printf("________________________________________________________________________\n");
+						printf("Unique RNTI\t|   DL\tRB\tbps        |   UL\tRB\tbps\n");
+
+						T_nof_prb = cell.nof_prb;
+						//printf("rnti %3d\t|   DL\t%.3f\t%8d   |   UL\t%.3f\t%8d\n", count_unique_rnti(T_RNTI_array, T_RNTI_i), T_drs / (50.0 * 10 * FRAME_AVE), T_dbs, T_urs / (50.0 * 10 * FRAME_AVE), T_ubs);
 						sfn = (sfn + sfn_offset)%1024;
 						state = DECODE_PDSCH;
 					}
 				}
 				break;
 			case DECODE_PDSCH:
-				srslte_ue_dl_get_control_cc(&ue_dl, sf_buffer, data, srslte_ue_sync_get_sfidx(&ue_sync), 0, sfn);
+
+			  if (last_sfn_ave != sfn && sfn % FRAME_AVE == 0) {
+			    //copy_things
+
+			    T_dbs = dl_bit_sum;
+			    T_ubs = ul_bit_sum;
+			    T_drs = dl_rb_sum;
+			    T_urs = ul_rb_sum;
+			    T_RNTI_i= RNTI_i;
+			    
+			    pthread_mutex_unlock(&mutex_print);
+			    //printf("array length = %d\n", RNTI_i);
+			    //printf("num unique RNTI %d\n", count_unique_rnti(RNTI_array, RNTI_i));
+			    //printf("averages %d\t%d\t%f\t%f\n", dl_bit_sum , ul_bit_sum, dl_rb_sum / (50.0 * 10 * FRAME_AVE), ul_rb_sum / (50.0 * 10 * FRAME_AVE));
+			    
+			    last_sfn_ave = sfn;
+			    RNTI_i = 0;
+			    dl_bit_sum = 0;
+			    ul_bit_sum = 0;
+			    dl_rb_sum = 0;
+			    ul_rb_sum = 0;
+			  }
+			  
+			  //MAX's note: below gets called once per subframe, it's where the OWL prints happen.
+			  srslte_ue_dl_get_control_cc(&ue_dl, sf_buffer, data, srslte_ue_sync_get_sfidx(&ue_sync), 0, sfn,
+						      RNTI_array, &RNTI_i, &dl_bit_sum, &ul_bit_sum, &dl_rb_sum, &ul_rb_sum);
+
+
+			  
+			  
+
+			  
+
+
 				if (ue_dl.current_rnti != 0xffff) {
 					//n = srslte_ue_dl_decode_broad(&ue_dl, &sf_buffer[prog_args.time_offset], data, srslte_ue_sync_get_sfidx(&ue_sync), ue_dl.current_rnti);
 					n = srslte_ue_dl_decode_multi(&ue_dl, sf_buffer, data, sfn*10+srslte_ue_sync_get_sfidx(&ue_sync));
+					
 					switch(n) {
 					case 0:
 						//        			printf("No decode\n");
@@ -667,7 +787,9 @@ int main(int argc, char **argv) {
 			}
 		}
 		sf_cnt++;
+
 	} // Main loop
+	free(RNTI_array);
 	if (!prog_args.disable_plots) {
 		if (!pthread_kill(plot_thread, 0)) {
 			pthread_kill(plot_thread, SIGHUP);
