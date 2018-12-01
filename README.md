@@ -1,3 +1,20 @@
+IMDEA-OWL modified with averaging
+=================================
+
+imdea_cc_decoder is modified to print averages instead of the raw control channel values.
+
+Download and compile just like imdeaowl.
+
+Usage is just like imdeaowl.
+```sh
+$ ./imdea_cc_decoder -d -f <freq>
+```
+
+![alt text](OWL_average_demo.png "mod OWL")
+
+
+
+
 IMDEA-OWL
 =========
 
