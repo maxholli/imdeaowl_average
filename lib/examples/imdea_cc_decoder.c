@@ -68,7 +68,7 @@ cell_search_cfg_t cell_detect_config = {
 #warning Compiling pdsch_ue with no RF support
 #endif
 
-
+//MAX's additions
 uint16_t *RNTI_array;
 uint16_t *T_RNTI_array;
 uint16_t T_RNTI_i;
@@ -286,24 +286,71 @@ void sig_int_handler(int signo)
 cf_t *sf_buffer[2] = {NULL, NULL}; 
 
 // MAX's contribution
-uint16_t count_unique_rnti(uint16_t *RNTI_array, uint16_t RNTI_i)
+void my_mergesort(uint16_t * a, uint16_t len)
 {
-  uint16_t uni_count = 0;
-  for (int i = 0; i < RNTI_i; i++) {
-    uint8_t is_unique = 1;
-    for (int j = 0; j < i; j++) {
-      if (RNTI_array[i] == RNTI_array[j]) {
-	is_unique = 0;
+  if ( len > 1 ) {
+    //split means: get i1, len1, i2 and len2
+    // [i1, ...len1..., i2, ...len2...] 
+    // i2 = i1 + len1
+    // len2 = len - len1                                                           
+    // len1 = len/2   
+    uint16_t i1, len1, i2, len2;
+    i1 = 0;
+    len1 = len/2;
+    i2 = i1 + len1;
+    len2 = len - len1;
+
+    my_mergesort(&a[i1], len1);
+    my_mergesort(&a[i2], len2);
+
+    //merge       
+    uint16_t * temp_array = (uint16_t *) malloc(sizeof(uint16_t) * len);
+    for (int i = 0; i < len; i++) {
+      if (i1 == len1) {
+        temp_array[i] = a[i2];
+        i2++;
+      } else if (i2 == len) {
+        temp_array[i] = a[i1];
+        i1++;
+      } else {
+        if (a[i1] < a[i2]) {
+          temp_array[i] = a[i1];
+          i1++;
+        } else {
+          temp_array[i] = a[i2];
+          i2++;
+	}
       }
     }
-    if (is_unique) {
-      uni_count++;
+    //copy over                  
+    for (int i = 0; i < len; i++) {
+      a[i] = temp_array[i];
     }
+    free(temp_array);
   }
-  return uni_count;
 }
 
+//MAXs contribution
+// a contains all of the RNTIs seen that second
+// len is the length of a
+// --> returns the number of unique RNTI
+uint16_t count_unique_rnti(uint16_t * a, uint16_t len)
+{
+  my_mergesort(a, len);
+  //a is sorted, do one pass over a to count unique
+  if (len == 0 || len == 1) {
+    return len;
+  }
+  uint16_t u_count = 1;
+  for (int i = 0; i < len-1; i++) {
+    if (a[i] != a[i+1]) {
+      u_count++;
+    }
+  }
+  return u_count;
+}
 
+//MAX's contribution
 void *PrintThread(void *threadid)
 {
   //long tid;
@@ -311,6 +358,9 @@ void *PrintThread(void *threadid)
 
   while (1) {
     pthread_mutex_lock(&mutex_print);
+    //copy RNTI_array into T_RNTI_array
+    //NOTE: potential race condition. count_unique_rnti() isn't finished before the copy starts again.
+    //chances of this are increased if you decrease FRAME_AVE (default 100)
     for(int i = 0; i < T_RNTI_i; i++) {
       T_RNTI_array[i] = RNTI_array[i];
     }
@@ -596,6 +646,7 @@ int main(int argc, char **argv) {
 
 	INFO("\nEntering main loop...\n\n", 0);
 
+	//MAX's additions
 	RNTI_array = malloc(sizeof(uint16_t)*200*FRAME_AVE);
 	uint16_t RNTI_i = 0;
 	uint64_t dl_bit_sum = 0;
@@ -652,7 +703,7 @@ int main(int argc, char **argv) {
 				}
 				break;
 			case DECODE_PDSCH:
-
+			  //sfn is system frame number
 			  if (last_sfn_ave != sfn && sfn % FRAME_AVE == 0) {
 			    //copy_things
 
@@ -660,10 +711,11 @@ int main(int argc, char **argv) {
 			    T_ubs = ul_bit_sum;
 			    T_drs = dl_rb_sum;
 			    T_urs = ul_rb_sum;
-			    T_RNTI_i= RNTI_i;
-			    
+			    T_RNTI_i = RNTI_i;
+
+			    //unlock lets the printing proceed.
 			    pthread_mutex_unlock(&mutex_print);
-			    //printf("array length = %d\n", RNTI_i);
+			    printf("array length = %d\n", RNTI_i);
 			    //printf("num unique RNTI %d\n", count_unique_rnti(RNTI_array, RNTI_i));
 			    //printf("averages %d\t%d\t%f\t%f\n", dl_bit_sum , ul_bit_sum, dl_rb_sum / (50.0 * 10 * FRAME_AVE), ul_rb_sum / (50.0 * 10 * FRAME_AVE));
 			    
