@@ -7,9 +7,13 @@ The goal was to try and modify OWL to run like SRS' AirScope.
 
 Download and compile just like imdeaowl.
 
-Usage is just like imdeaowl.
+Usage is just like imdeaowl:
 ```sh
 $ ./imdea_cc_decoder -d -f <freq>
+```
+Write the original OWL output to file, use the __-w__ option:
+```sh
+$ ./imdea_cc_decoder -d -f <freq> -w <output_filename>
 ```
 
 ![alt text](OWL_mod.png "mod OWL")
