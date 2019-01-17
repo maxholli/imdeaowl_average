@@ -49,7 +49,7 @@ int srslte_dci_msg_to_average(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 		uint32_t nof_prb, uint32_t nof_ports, srslte_ra_dl_dci_t *dl_dci, srslte_ra_ul_dci_t *ul_dci,
 		srslte_ra_dl_grant_t *dl_grant, srslte_ra_ul_grant_t *ul_grant, uint8_t sf_idx, uint32_t sfn, int prob,
 			      uint32_t ncce, uint32_t aggregation, srslte_dci_format_t format, uint32_t cfi, float power,
-			      uint16_t *RNTI_array, uint16_t *RNTI_i, uint64_t *dl_bit_sum, uint64_t *ul_bit_sum, uint64_t *dl_rb_sum, uint64_t *ul_rb_sum)
+			      uint16_t *RNTI_array, uint16_t *RNTI_i, uint64_t *dl_bit_sum, uint64_t *ul_bit_sum, uint64_t *dl_rb_sum, uint64_t *ul_rb_sum, FILE *write_fp)
 {
 			  
 	int ret = SRSLTE_ERROR_INVALID_INPUTS;
@@ -106,6 +106,17 @@ int srslte_dci_msg_to_average(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 						*RNTI_i = *RNTI_i + 1;
 						*ul_bit_sum += ul_grant->mcs.tbs;
 						*ul_rb_sum += ul_grant->L_prb;
+						if (write_fp != NULL) {
+						  char write_str[100];
+						  sprintf(write_str, "%04d\t%d\t%d\t0\t"
+							  "%d\t%d\t%d\t%d\t%d\t"
+							  "0\t%d\t-1\t%d\t"
+							  "%d\t%d\t%d\t%d\n", sfn, sf_idx, msg_rnti,
+							  ul_grant->mcs.idx, ul_grant->L_prb, ul_grant->mcs.tbs, -1, -1,
+							  ul_dci->ndi, (10*sfn+sf_idx)%8,
+							  ncce, aggregation, cfi, prob);
+						  fputs(write_str, write_fp);
+						}
 					} else {
 			
 				    //	fprintf(stdout, "%04d\t%d\t%d\t0\t"
@@ -120,6 +131,17 @@ int srslte_dci_msg_to_average(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 						*RNTI_i = *RNTI_i + 1;
 						*ul_bit_sum += 0;
 						*ul_rb_sum += ul_grant->L_prb;
+						if (write_fp != NULL) {
+						  char write_str[100];
+						  sprintf(write_str, "%04d\t%d\t%d\t0\t"
+							  "%d\t%d\t%d\t%d\t%d\t"
+							  "0\t%d\t-1\t%d\t"
+							  "%d\t%d\t%d\t%d\n", sfn, sf_idx, msg_rnti,
+							  ul_grant->mcs.idx, ul_grant->L_prb, 0, -1, -1,
+							  ul_dci->ndi, (10*sfn+sf_idx)%8,
+							  ncce, aggregation, cfi, prob);
+						  fputs(write_str, write_fp);
+						}
 					}
 				}
 				ret = SRSLTE_SUCCESS;
@@ -166,6 +188,17 @@ int srslte_dci_msg_to_average(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 					*RNTI_i = *RNTI_i + 1;
 					*dl_bit_sum += dl_grant->mcs.tbs;
 					*dl_rb_sum += dl_grant->nof_prb;
+					if (write_fp != NULL) {
+					  char write_str[100];
+					  sprintf(write_str, "%04d\t%d\t%d\t1\t"
+						  "%d\t%d\t%d\t%d\t%d\t"
+						  "%d\t%d\t%d\t%d\t"
+						  "%d\t%d\t%d\t%d\n", sfn, sf_idx, msg_rnti,
+						  dl_grant->mcs.idx, dl_grant->nof_prb, dl_grant->mcs.tbs, -1, -1,
+						  msg->format+1, dl_dci->ndi, -1, dl_dci->harq_process,
+						  ncce, aggregation, cfi, prob);
+					  fputs(write_str, write_fp);
+					}
 
 					break;
 				case SRSLTE_DCI_FORMAT2:
@@ -184,7 +217,17 @@ int srslte_dci_msg_to_average(srslte_dci_msg_t *msg, uint16_t msg_rnti,
 					*RNTI_i = *RNTI_i + 1;
 					*dl_bit_sum += dl_grant->mcs.tbs + dl_grant->mcs2.tbs;
 					*dl_rb_sum += dl_grant->nof_prb;
-
+					if (write_fp != NULL) {
+					  char write_str[100];
+					  sprintf(write_str, "%04d\t%d\t%d\t1\t"
+						  "%d\t%d\t%d\t%d\t%d\t"
+						  "%d\t%d\t%d\t%d\t"
+						  "%d\t%d\t%d\t%d\n", sfn, sf_idx, msg_rnti,
+						  dl_grant->mcs.idx, dl_grant->nof_prb, dl_grant->mcs.tbs + dl_grant->mcs2.tbs, dl_grant->mcs.tbs, dl_grant->mcs2.tbs,
+						  msg->format+1, dl_dci->ndi, dl_dci->ndi_1, dl_dci->harq_process,
+						  ncce, aggregation, cfi, prob);
+					  fputs(write_str, write_fp);
+					}
 					break;
 				//case SRSLTE_DCI_FORMAT3:
 				//case SRSLTE_DCI_FORMAT3A:

@@ -210,7 +210,8 @@ SRSLTE_API int srslte_ue_dl_get_control_cc(srslte_ue_dl_t *q,
 					   uint64_t *dl_bit_sum,
 					   uint64_t *ul_bit_sum,
 					   uint64_t *dl_rb_sum,
-					   uint64_t *ul_rb_sum);
+					   uint64_t *ul_rb_sum,
+					   FILE *write_fp);
 
 SRSLTE_API bool srslte_ue_dl_decode_phich(srslte_ue_dl_t *q, 
                                           uint32_t sf_idx, 

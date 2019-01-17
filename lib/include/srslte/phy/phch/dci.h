@@ -127,7 +127,8 @@ SRSLTE_API int srslte_dci_msg_to_average(srslte_dci_msg_t *msg,
 				       uint64_t *dl_bit_sum,
 				       uint64_t *ul_bit_sum,
 				       uint64_t *dl_rb_sum,
-				       uint64_t *ul_rb_sum);
+				       uint64_t *ul_rb_sum,
+				       FILE *write_fp);
 
 // IMDEA contribution: this function prints the traces for the LTE sniffer either on stdout, file or both
 SRSLTE_API int srslte_dci_msg_to_trace(srslte_dci_msg_t *msg,

@@ -111,6 +111,7 @@ typedef struct {
 	int net_port_signal;
 	char *net_address_signal;
 	int decimate;
+  char *arg_filename;
 }prog_args_t;
 
 void args_default(prog_args_t *args) {
@@ -185,7 +186,7 @@ void usage(prog_args_t *args, char *prog) {
 void parse_args(prog_args_t *args, int argc, char **argv) {
 	int opt;
 	args_default(args);
-	while ((opt = getopt(argc, argv, "aAoglipPcOCtdnvfuUsSyYzZ")) != -1) {
+	while ((opt = getopt(argc, argv, "aAoglipPcOCtdnvfuUsSyYzZw")) != -1) {
 		switch (opt) {
 		case 'i':
 			args->input_file_name = argv[optind];
@@ -259,6 +260,9 @@ void parse_args(prog_args_t *args, int argc, char **argv) {
 		case 'Z':
 			args->rnti_list_file = argv[optind];
 			break;
+		case 'w':
+		  args->arg_filename = argv[optind];
+		  break;
 		default:
 			usage(args, argv[0]);
 			exit(-1);
@@ -654,7 +658,10 @@ int main(int argc, char **argv) {
 	uint64_t dl_rb_sum = 0;
 	uint64_t ul_rb_sum = 0;
 	uint32_t last_sfn_ave = 0;
-
+	FILE * write_fp = NULL;
+	if (prog_args.arg_filename != NULL) {
+	  write_fp = fopen(prog_args.arg_filename, "w");
+	}
 	/* Main loop */
 	while (!go_exit && (sf_cnt < prog_args.nof_subframes || prog_args.nof_subframes == -1)) {
 
@@ -715,7 +722,7 @@ int main(int argc, char **argv) {
 
 			    //unlock lets the printing proceed.
 			    pthread_mutex_unlock(&mutex_print);
-			    printf("array length = %d\n", RNTI_i);
+			    //printf("array length = %d\n", RNTI_i);
 			    //printf("num unique RNTI %d\n", count_unique_rnti(RNTI_array, RNTI_i));
 			    //printf("averages %d\t%d\t%f\t%f\n", dl_bit_sum , ul_bit_sum, dl_rb_sum / (50.0 * 10 * FRAME_AVE), ul_rb_sum / (50.0 * 10 * FRAME_AVE));
 			    
@@ -729,7 +736,8 @@ int main(int argc, char **argv) {
 			  
 			  //MAX's note: below gets called once per subframe, it's where the OWL prints happen.
 			  srslte_ue_dl_get_control_cc(&ue_dl, sf_buffer, data, srslte_ue_sync_get_sfidx(&ue_sync), 0, sfn,
-						      RNTI_array, &RNTI_i, &dl_bit_sum, &ul_bit_sum, &dl_rb_sum, &ul_rb_sum);
+						      RNTI_array, &RNTI_i, &dl_bit_sum, &ul_bit_sum, &dl_rb_sum, &ul_rb_sum,
+						      write_fp);
 
 
 			  
@@ -842,6 +850,7 @@ int main(int argc, char **argv) {
 
 	} // Main loop
 	free(RNTI_array);
+	fclose(write_fp);
 	if (!prog_args.disable_plots) {
 		if (!pthread_kill(plot_thread, 0)) {
 			pthread_kill(plot_thread, SIGHUP);

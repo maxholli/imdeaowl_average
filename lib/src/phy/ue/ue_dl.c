@@ -568,9 +568,10 @@ static int find_dl_dci_type_crnti(srslte_ue_dl_t *q, uint32_t cfi, uint32_t sf_i
   return SRSLTE_SUCCESS; 
 }
 
+//srslte_ue_dl_find_dci_cc doesn't have prototype in the ue_dl.h file
 int srslte_ue_dl_find_dci_cc(srslte_ue_dl_t *q, srslte_dci_msg_t *dci_msg, uint32_t cfi, uint32_t sf_idx,
 			     srslte_rnti_type_t rnti_type, uint32_t sfn,
-			     uint16_t *RNTI_array, uint16_t *RNTI_i, uint64_t *dl_bit_sum, uint64_t *ul_bit_sum, uint64_t *dl_rb_sum, uint64_t *ul_rb_sum)
+			     uint16_t *RNTI_array, uint16_t *RNTI_i, uint64_t *dl_bit_sum, uint64_t *ul_bit_sum, uint64_t *dl_rb_sum, uint64_t *ul_rb_sum, FILE *write_fp)
 	/* IMDEA contribution: DCI power analysis */
 {
   srslte_dci_location_t locations[MAX_CANDIDATES_BLIND];
@@ -628,7 +629,8 @@ int srslte_ue_dl_find_dci_cc(srslte_ue_dl_t *q, srslte_dci_msg_t *dci_msg, uint3
 			  if (srslte_dci_msg_to_average(dci_msg, crc_rem, q->cell.nof_prb, q->cell.nof_ports,
 				  &dl_dci_unpacked, &ul_dci_unpacked, &dl_grant, &ul_grant, sf_idx, sfn, lprob[i],
 							locations[i].ncce, locations[i].L, formats[f], q->cfi, power,
-							RNTI_array, RNTI_i, dl_bit_sum, ul_bit_sum, dl_rb_sum, ul_rb_sum)) {
+							RNTI_array, RNTI_i, dl_bit_sum, ul_bit_sum, dl_rb_sum, ul_rb_sum,
+							write_fp)) {
 			    continue;
 				  //fprintf(stderr,"1 Error unpacking DCI\n");
 			  }
@@ -677,7 +679,7 @@ int srslte_ue_dl_find_dci_cc(srslte_ue_dl_t *q, srslte_dci_msg_t *dci_msg, uint3
 
 // MAXNOTE: srslte_ue_dl_get_control_cc is OWL's addition
 int srslte_ue_dl_get_control_cc(srslte_ue_dl_t *q, cf_t *input[SRSLTE_MAX_PORTS], uint8_t *data, uint32_t sf_idx, uint32_t rvidx, uint32_t sfn,
-				uint16_t *RNTI_array, uint16_t *RNTI_i, uint64_t *dl_bit_sum, uint64_t *ul_bit_sum, uint64_t *dl_rb_sum, uint64_t *ul_rb_sum)
+				uint16_t *RNTI_array, uint16_t *RNTI_i, uint64_t *dl_bit_sum, uint64_t *ul_bit_sum, uint64_t *dl_rb_sum, uint64_t *ul_rb_sum, FILE * write_fp)
 {
   srslte_dci_msg_t dci_msg;
   int ret = SRSLTE_ERROR;
@@ -696,7 +698,7 @@ int srslte_ue_dl_get_control_cc(srslte_ue_dl_t *q, cf_t *input[SRSLTE_MAX_PORTS]
 
   //below contains the prints
   return srslte_ue_dl_find_dci_cc(q, &dci_msg, q->cfi, sf_idx, SRSLTE_RNTI_USER, sfn,
-				  RNTI_array, RNTI_i, dl_bit_sum, ul_bit_sum, dl_rb_sum, ul_rb_sum);
+				  RNTI_array, RNTI_i, dl_bit_sum, ul_bit_sum, dl_rb_sum, ul_rb_sum, write_fp);
 }
 
 int srslte_ue_dl_find_dl_dci_type(srslte_ue_dl_t *q, uint32_t cfi, uint32_t sf_idx, 
